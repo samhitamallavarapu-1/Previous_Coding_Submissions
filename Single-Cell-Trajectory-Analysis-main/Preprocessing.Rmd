@@ -1,0 +1,72 @@
+---
+title: "Preprocessing"
+output: html_document
+date: "2023-12-29"
+---
+```{r}
+BiocManager::install(c('BiocGenerics', 'DelayedArray', 'DelayedMatrixStats',
+                       'limma', 'lme4', 'S4Vectors', 'SingleCellExperiment',
+                       'SummarizedExperiment', 'batchelor', 'HDF5Array',
+                       'terra', 'ggrastr'))
+```
+
+```{r}
+devtools::install_github('cole-trapnell-lab/monocle3')
+```
+
+```{r}
+install.packages('Seurat')
+```
+
+```{r}
+devtools::install_github("satijalab/seurat-wrappers")
+```
+
+
+
+```{r}
+library(monocle3)
+library(Seurat)
+options(Seurat.object.assay.version = "v3")
+```
+
+
+```{r}
+files <- list.files('data')
+files <- grep("2i", files, value = TRUE)
+files <- grep("h5", files, value = TRUE)
+files
+```
+
+
+
+```{r}
+input_files <- function(h5_path){
+  day <- sub("^.*_D([^_]*)_Dox.*$", "\\1", h5_path)
+  day <- sub("^.*_D([^_]*)_2i.*$", "\\1", day)
+  
+  data <- Read10X_h5(paste0('data/', h5_path))
+  data <- CreateSeuratObject(data, min.cells = 0, min.features = 200)
+  data[["percent.mt"]] <- PercentageFeatureSet(data, pattern = "mt-")
+  lb <- quantile(data[["nFeature_RNA"]]$nFeature_RNA, probs = 0.02)
+  ub <- quantile(data[["nFeature_RNA"]]$nFeature_RNA, probs = 0.97)
+  data <- data[, data[["nFeature_RNA"]] > lb & data[["nFeature_RNA"]] < ub & data[["percent.mt"]] < 15]
+  
+  data$day <- day
+  return(data)
+}
+```
+
+
+```{r}
+data_list <- sapply(files, input_files)
+```
+
+```{r}
+data <- merge(data_list[1]$GSM3195682_D8.25_2i_C1_gene_bc_mat.h5, y = data_list[2:length(data_list)])
+```
+
+```{r}
+data
+saveRDS(data,file='./data.RDS')
+```

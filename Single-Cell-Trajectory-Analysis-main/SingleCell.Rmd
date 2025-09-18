@@ -1,0 +1,74 @@
+---
+title: "SingleCell"
+output:
+  html_document: default
+  pdf_document: default
+date: "2023-12-29"
+---
+
+```{r}
+library(monocle3)
+library(Seurat)
+options(Seurat.object.assay.version = "v3")
+
+data <- readRDS(file='./data.RDS')
+
+args <- commandArgs(trailingOnly = TRUE)
+args
+n_features = as.numeric(args[1])
+n_pcs = as.numeric(args[2])
+
+data <- NormalizeData(object = data, verbose = FALSE)
+data <- FindVariableFeatures(object = data, nfeatures = n_features, verbose = FALSE, selection.method = 'vst')
+data <- ScaleData(data, verbose = FALSE)
+data <- RunPCA(data, npcs = n_pcs, verbose = FALSE)
+data <- FindNeighbors(data, dims = 1:n_pcs)
+
+data <- RunUMAP(data, reduction = "pca", dims = 1:n_pcs)
+
+
+data@active.assay = 'RNA'
+```
+
+```{r}
+DimPlot(data, group.by = c("day"))
+```
+
+```{r}
+data$dayint <- data[[]]$day
+data$dayint <- ifelse(data$dayint == "iPSC", 20, data$dayint)
+data$dayint <- as.numeric(data$dayint)
+
+FeaturePlot(data, "dayint")
+```
+
+```{r}
+cds <- SeuratWrappers::as.cell_data_set(data) #change to cds here
+
+cds <- cluster_cells(cds)
+
+plot_cells(cds, show_trajectory_graph = TRUE,label_principal_points = TRUE,
+           color_cells_by = "partition")
+```
+
+```{r}
+cds <- learn_graph(cds, use_partition = FALSE) #graph learned across all partitions
+```
+
+```{r}
+plot_cells(cds, show_trajectory_graph = TRUE,label_principal_points = TRUE,
+           color_cells_by = "partition")
+```
+
+```{r}
+cds
+root_pr_node = as.character(args[3])
+cds <- order_cells(cds,
+  reduction_method = "UMAP",
+  root_pr_nodes = root_pr_node,
+  verbose = FALSE)
+```
+
+```{r}
+plot_cells(cds, color_cells_by = "pseudotime", label_branch_points=FALSE, label_leaves=FALSE)
+```
